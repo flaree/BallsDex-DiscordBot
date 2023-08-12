@@ -1,25 +1,15 @@
 import discord
-import logging
-import random
 
 from discord import app_commands
-from discord.ui import Button
 from discord.ext import commands
-from discord.utils import format_dt
-from tortoise.exceptions import IntegrityError, DoesNotExist
-from typing import TYPE_CHECKING, cast
-from ballsdex.core.utils.buttons import ConfirmChoiceView
+from typing import TYPE_CHECKING
 
 from ballsdex.settings import settings
-from ballsdex.core.models import GuildConfig, Player, BallInstance, BlacklistedID, BlacklistedGuild
-from ballsdex.core.utils.transformers import BallInstanceTransform, BallTransform, SpecialTransform
+from ballsdex.core.utils.transformers import BallInstanceTransform
 from ballsdex.core.utils.paginator import FieldPageSource, Pages
-from ballsdex.packages.countryballs.countryball import CountryBall
 
 if TYPE_CHECKING:
     from ballsdex.core.bot import BallsDexBot
-
-log = logging.getLogger("ballsdex.packages.admin.cog")
 
 
 @app_commands.guilds(*settings.admin_guild_ids)
