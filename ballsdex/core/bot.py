@@ -8,13 +8,25 @@ from typing import cast
 import aiohttp
 import discord
 import discord.gateway
+from cachetools import TTLCache
 from discord import app_commands
 from discord.ext import commands
 from rich import print
 
 from ballsdex.core.dev import Dev
 from ballsdex.core.metrics import PrometheusServer
-from ballsdex.core.models import BlacklistedGuild, BlacklistedID, Special, Ball, balls, specials
+from ballsdex.core.models import (
+    BlacklistedGuild,
+    BlacklistedID,
+    Special,
+    Ball,
+    Regime,
+    Economy,
+    balls,
+    regimes,
+    economies,
+    specials,
+)
 from ballsdex.core.commands import Core
 from ballsdex.settings import settings
 
@@ -67,7 +79,7 @@ class BallsDexBot(commands.AutoShardedBot):
         self._shutdown = 0
         self.blacklist: set[int] = set()
         self.blacklist_guild: set[int] = set()
-        self.locked_balls: set[int] = set()
+        self.locked_balls = TTLCache(maxsize=99999, ttl=60 * 30)
 
     async def start_prometheus_server(self):
         self.prometheus_server = PrometheusServer(
@@ -102,12 +114,22 @@ class BallsDexBot(commands.AutoShardedBot):
     async def load_cache(self):
         balls.clear()
         for ball in await Ball.all():
-            balls.append(ball)
+            balls[ball.pk] = ball
         log.info(f"Loaded {len(balls)} balls")
+
+        regimes.clear()
+        for regime in await Regime.all():
+            regimes[regime.pk] = regime
+        log.info(f"Loaded {len(regimes)} regimes")
+
+        economies.clear()
+        for economy in await Economy.all():
+            economies[economy.pk] = economy
+        log.info(f"Loaded {len(economies)} economies")
 
         specials.clear()
         for special in await Special.all():
-            specials.append(special)
+            specials[special.pk] = special
         log.info(f"Loaded {len(specials)} specials")
 
         self.blacklist = set()
