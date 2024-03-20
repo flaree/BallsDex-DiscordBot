@@ -360,12 +360,14 @@ class DonationPolicy(IntEnum):
     ALWAYS_ACCEPT = 1
     REQUEST_APPROVAL = 2
     ALWAYS_DENY = 3
+    FRIENDS_ONLY = 4
 
 
 class PrivacyPolicy(IntEnum):
     ALLOW = 1
     DENY = 2
     SAME_SERVER = 3
+    FRIENDS_ONLY = 4
 
 
 class Player(models.Model):
@@ -387,6 +389,29 @@ class Player(models.Model):
     def __str__(self) -> str:
         return str(self.discord_id)
 
+    async def is_blocked(self, other: Player) -> bool:
+        return await Block.filter(player1=self, player2=other).exists()
+    
+    async def is_friend(self, other: Player) -> bool:
+        return await Friend.filter(player1=self, player2=other).exists()
+    
+    async def block(self, other: Player) -> None:
+        await Block.create(player1=self, player2=other)
+    
+    async def unblock(self, other: Player) -> None:
+        await Block.filter(player1=self, player2=other).delete()
+    
+    async def friend(self, other: Player) -> None:
+        await Friend.create(player1=self, player2=other)
+    
+    async def unfriend(self, other: Player) -> None:
+        await Friend.filter(player1=self, player2=other).delete()
+
+    async def get_friends(self) -> list[Player]:
+        return await Player.filter(friends__player1=self)
+    
+    async def get_blocked(self) -> list[Player]:
+        return await Player.filter(blocks__player1=self)
 
 class BlacklistedID(models.Model):
     discord_id = fields.BigIntField(
@@ -440,3 +465,21 @@ class TradeObject(models.Model):
 
     def __str__(self) -> str:
         return str(self.pk)
+
+class Friend(models.Model):
+    player1: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
+        "models.Player", related_name="friends"
+    )
+    player2: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
+        "models.Player", related_name="friends2"
+    )
+    date = fields.DatetimeField(auto_now_add=True)
+    
+class Block(models.Model):
+    player1: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
+        "models.Player", related_name="blocks"
+    )
+    player2: fields.ForeignKeyRelation[Player] = fields.ForeignKeyField(
+        "models.Player", related_name="blocks2"
+    )
+    date = fields.DatetimeField(auto_now_add=True)
