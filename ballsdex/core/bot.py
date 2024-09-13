@@ -227,7 +227,7 @@ class BallsDexBot(commands.AutoShardedBot):
             self.blacklist_guild.add(blacklisted_id.discord_id)
         table.add_row("Blacklisted guilds", str(len(self.blacklist_guild)))
 
-        log.info("Cache loaded, summary displayed below")
+        log.info("Cache loaded, summary displayed below:")
         console = Console()
         console.print(table)
 
@@ -294,8 +294,9 @@ class BallsDexBot(commands.AutoShardedBot):
             )
 
         await self.load_cache()
+        grammar = "" if len(self.blacklist) == 1 else "s"
         if self.blacklist:
-            log.info(f"{len(self.blacklist)} blacklisted users.")
+            log.info(f"{len(self.blacklist)} blacklisted user{grammar}.")
 
         log.info("Loading packages...")
         await self.add_cog(Core(self))
@@ -320,8 +321,9 @@ class BallsDexBot(commands.AutoShardedBot):
         await asyncio.sleep(sleep_delay)
 
         synced_commands = await self.tree.sync()
+        grammar = "" if synced_commands == 1 else "s"
         if synced_commands:
-            log.info(f"Synced {len(synced_commands)} commands.")
+            log.info(f"Synced {len(synced_commands)} command{grammar}.")
             try:
                 self.assign_ids_to_app_commands(synced_commands)
             except Exception:
@@ -335,7 +337,10 @@ class BallsDexBot(commands.AutoShardedBot):
                 if not guild:
                     continue
                 synced_commands = await self.tree.sync(guild=guild)
-                log.info(f"Synced {len(synced_commands)} admin commands for guild {guild.id}.")
+                grammar = "" if len(synced_commands) == 1 else "s"
+                log.info(
+                    f"Synced {len(synced_commands)} admin command{grammar} for guild {guild.id}."
+                )
 
         if settings.prometheus_enabled:
             try:
@@ -400,10 +405,6 @@ class BallsDexBot(commands.AutoShardedBot):
                     f"The bot is missing the permissions: `{missing_perms}`."
                     " Give the bot those permissions for the command to work as expected."
                 )
-                log.warning(
-                    f"Missing bot permissions for command {context.command.name}: {missing_perms}",
-                    exc_info=exception,
-                )
                 return
 
             if isinstance(exception, commands.MissingPermissions):
@@ -444,11 +445,6 @@ class BallsDexBot(commands.AutoShardedBot):
                 await send(
                     f"The bot is missing the permissions: `{missing_perms}`."
                     " Give the bot those permissions for the command to work as expected."
-                )
-                command_name = getattr(interaction.command, "name", "unknown")
-                log.warning(
-                    f"Missing bot permissions for command {command_name}: {missing_perms}",
-                    exc_info=error,
                 )
                 return
 
