@@ -179,14 +179,25 @@ class Player(commands.GroupCog):
         if user.bot:
             await interaction.response.send_message("You cannot add a bot.", ephemeral=True)
             return
+        if player2.discord_id in self.bot.blacklist:
+            await interaction.response.send_message(
+                "You cannot add a blacklisted user as a friend.", ephemeral=True
+            )
+            return
 
         blocked = await player1.is_blocked(player2)
+        player2_blocked = await player2.is_blocked(player1)
 
         if blocked:
             player_unblock = self.block_remove.extras.get("mention", "/player block remove")
             await interaction.response.send_message(
                 "You cannot add a blocked user. To unblock, use " f"{player_unblock}.",
                 ephemeral=True,
+            )
+            return
+        if player2_blocked:
+            await interaction.response.send_message(
+                "This user has blocked you, you cannot add them as a friend.", ephemeral=True
             )
             return
 
@@ -201,6 +212,7 @@ class Player(commands.GroupCog):
             await interaction.response.send_message(
                 f"{user.mention}, {interaction.user} has sent you a friend request!",
                 view=view,
+                allowed_mentions=discord.AllowedMentions(users=player2.can_be_mentioned),
             )
             await view.wait()
 
@@ -420,7 +432,7 @@ class Player(commands.GroupCog):
                 "You haven't got any statistics to show!", ephemeral=True
             )
             return
-        ball = await BallInstance.filter(player=player).prefetch_related("special")
+        ball = await BallInstance.filter(player=player).prefetch_related("special", "trade_player")
 
         user = interaction.user
         bot_countryballs = {x: y.emoji_id for x, y in balls.items() if y.enabled}
@@ -452,11 +464,11 @@ class Player(commands.GroupCog):
         embed.description = (
             "Here are your current statistics in the bot!\n\n"
             f"**Completion:** {completion_percentage}\n"
-            f"**{settings.collectible_name.title()}s Owned:** {len(balls_owned)}\n"
-            f"**Caught {settings.collectible_name.title()}s Owned**: {len(caught_owned)}\n"
-            f"**Shiny {settings.collectible_name.title()}s:** {len(shiny)}\n"
-            f"**Special {settings.collectible_name.title()}s:** {len(special)}\n"
-            f"**Trades Completed:** {trades}"
+            f"**{settings.collectible_name.title()}s Owned:** {len(balls_owned):,}\n"
+            f"**Caught {settings.collectible_name.title()}s Owned**: {len(caught_owned):,}\n"
+            f"**Shiny {settings.collectible_name.title()}s:** {len(shiny):,}\n"
+            f"**Special {settings.collectible_name.title()}s:** {len(special):,}\n"
+            f"**Trades Completed:** {trades:,}"
         )
         embed.set_footer(text="Keep collecting and trading to improve your stats!")
         embed.set_thumbnail(url=user.display_avatar)  # type: ignore
