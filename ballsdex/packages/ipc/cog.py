@@ -281,12 +281,6 @@ class IPC(commands.Cog):
     async def get_guild(self, guild_id, command_id: str):
         guild = self.bot.get_guild(guild_id)
         if guild is None:
-            payload = {"output": "Guild not found.", "command_id": command_id}
-            await self.bot.redis.execute_command(
-                "PUBLISH",
-                settings.redis_db,
-                json.dumps(payload),
-            )
             return
         payload = {"output": [guild.id, guild.name, guild.member_count], "command_id": command_id}
         await self.bot.redis.execute_command(
@@ -298,12 +292,6 @@ class IPC(commands.Cog):
     async def get_emoji(self, emoji_id, command_id: str):
         emoji = self.bot.get_emoji(emoji_id)
         if emoji is None:
-            payload = {"output": "Emoji not found.", "command_id": command_id}
-            await self.bot.redis.execute_command(
-                "PUBLISH",
-                settings.redis_db,
-                json.dumps(payload),
-            )
             return
         payload = {"output": [emoji.id, emoji.name], "command_id": command_id}
         await self.bot.redis.execute_command(
@@ -315,12 +303,6 @@ class IPC(commands.Cog):
     async def get_user(self, user_id, command_id: str):
         user = self.bot.get_user(user_id)
         if user is None:
-            payload = {"output": "User not found.", "command_id": command_id}
-            await self.bot.redis.execute_command(
-                "PUBLISH",
-                settings.redis_db,
-                json.dumps(payload),
-            )
             return
         payload = {"output": [user.id, user.name], "command_id": command_id}
         await self.bot.redis.execute_command(
@@ -332,12 +314,6 @@ class IPC(commands.Cog):
     async def get_channel(self, channel_id, command_id: str):
         channel = self.bot.get_channel(channel_id)
         if channel is None:
-            payload = {"output": "Channel not found.", "command_id": command_id}
-            await self.bot.redis.execute_command(
-                "PUBLISH",
-                settings.redis_db,
-                json.dumps(payload),
-            )
             return
         payload = {"output": [channel.id, channel.name], "command_id": command_id}
         await self.bot.redis.execute_command(

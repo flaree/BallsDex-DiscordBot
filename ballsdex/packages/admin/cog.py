@@ -201,10 +201,10 @@ class Admin(commands.GroupCog):
             try:
                 if cog := self.bot.get_cog("IPC"):
                     guild = await cog.handler(
-                        "get_guild", self.bot.cluster_count, {"guild_id": guild_id}
+                        "get_guild", 1, {"guild_id": guild_id}
                     )
                     Guild = namedtuple("Guild", "id name member_count")
-                    if guild == "Guild not found.":
+                    if not guild:
                         await interaction.response.send_message(
                             "The given guild could not be found.", ephemeral=True
                         )
