@@ -1,10 +1,10 @@
 import asyncio
-from contextlib import redirect_stdout
 import io
 import json
-from logging import getLogger
 import textwrap
 import traceback
+from contextlib import redirect_stdout
+from logging import getLogger
 from uuid import uuid4
 
 import discord
@@ -112,7 +112,7 @@ class IPC(commands.Cog):
             result = "Error: " + "{}{}".format(stdout.getvalue(), traceback.format_exc())
         else:
             printed = stdout.getvalue()
-        
+
         if result_func is not None:
             result = printed + str(result_func).rstrip()
         else:
@@ -272,6 +272,74 @@ class IPC(commands.Cog):
         guilds = [[x.id, x.name, x.member_count] for x in guilds]
 
         payload = {"output": guilds, "command_id": command_id}
+        await self.bot.redis.execute_command(
+            "PUBLISH",
+            settings.redis_db,
+            json.dumps(payload),
+        )
+
+    async def get_guild(self, guild_id, command_id: str):
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            payload = {"output": "Guild not found.", "command_id": command_id}
+            await self.bot.redis.execute_command(
+                "PUBLISH",
+                settings.redis_db,
+                json.dumps(payload),
+            )
+            return
+        payload = {"output": [guild.id, guild.name, guild.member_count], "command_id": command_id}
+        await self.bot.redis.execute_command(
+            "PUBLISH",
+            settings.redis_db,
+            json.dumps(payload),
+        )
+
+    async def get_emoji(self, emoji_id, command_id: str):
+        emoji = self.bot.get_emoji(emoji_id)
+        if emoji is None:
+            payload = {"output": "Emoji not found.", "command_id": command_id}
+            await self.bot.redis.execute_command(
+                "PUBLISH",
+                settings.redis_db,
+                json.dumps(payload),
+            )
+            return
+        payload = {"output": [emoji.id, emoji.name], "command_id": command_id}
+        await self.bot.redis.execute_command(
+            "PUBLISH",
+            settings.redis_db,
+            json.dumps(payload),
+        )
+    
+    async def get_user(self, user_id, command_id: str):
+        user = self.bot.get_user(user_id)
+        if user is None:
+            payload = {"output": "User not found.", "command_id": command_id}
+            await self.bot.redis.execute_command(
+                "PUBLISH",
+                settings.redis_db,
+                json.dumps(payload),
+            )
+            return
+        payload = {"output": [user.id, user.name], "command_id": command_id}
+        await self.bot.redis.execute_command(
+            "PUBLISH",
+            settings.redis_db,
+            json.dumps(payload),
+        )
+    
+    async def get_channel(self, channel_id, command_id: str):
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            payload = {"output": "Channel not found.", "command_id": command_id}
+            await self.bot.redis.execute_command(
+                "PUBLISH",
+                settings.redis_db,
+                json.dumps(payload),
+            )
+            return
+        payload = {"output": [channel.id, channel.name], "command_id": command_id}
         await self.bot.redis.execute_command(
             "PUBLISH",
             settings.redis_db,

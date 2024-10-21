@@ -194,7 +194,19 @@ class Admin(commands.GroupCog):
         """
         if guild_id:
             try:
-                guild = self.bot.get_guild(int(guild_id))
+                if cog := self.bot.get_cog("IPC"):
+                    guild = await cog.handler(
+                        "get_guild", self.bot.cluster_count, {"guild_id": guild_id}
+                    )
+                    Guild = namedtuple("Guild", "id name member_count")
+                    if guild == "Guild not found.":
+                        await interaction.response.send_message(
+                            "The given guild could not be found.", ephemeral=True
+                        )
+                        return
+                    guild = Guild(*guild)
+                else:
+                    guild = self.bot.get_guild(int(guild_id))
             except ValueError:
                 await interaction.response.send_message(
                     "Invalid guild ID. Please make sure it's a number.", ephemeral=True
