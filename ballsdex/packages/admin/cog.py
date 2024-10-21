@@ -201,7 +201,7 @@ class Admin(commands.GroupCog):
             try:
                 if cog := self.bot.get_cog("IPC"):
                     guild = await cog.handler(
-                        "get_guild", 1, {"guild_id": guild_id}
+                        "get_guild", 1, {"guild_id": int(guild_id)}
                     )
                     Guild = namedtuple("Guild", "id name member_count")
                     if not guild:
