@@ -74,6 +74,11 @@ class Admin(commands.GroupCog):
         self.bot = bot
         self.blacklist.parent = self.__cog_app_commands_group__
         self.balls.parent = self.__cog_app_commands_group__
+        self.ctx_menu = app_commands.ContextMenu(name="Update Art", callback=self.update_art)
+        self.bot.tree.add_command(self.ctx_menu)
+
+    async def cog_unload(self):
+        self.bot.tree.remove_command(self.ctx_menu)
 
     blacklist = app_commands.Group(name="blacklist", description="Bot blacklist management")
     blacklist_guild = app_commands.Group(
@@ -1758,3 +1763,84 @@ class Admin(commands.GroupCog):
         )
         embed.set_thumbnail(url=user.display_avatar)  # type: ignore
         await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.guilds(*settings.admin_guild_ids)
+    @app_commands.checks.has_any_role(*settings.root_role_ids)
+    async def update_art(self, interaction: discord.Interaction, message: discord.Message):
+        """
+        Update the artwork of a countryball.
+        """
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        if message.channel.parent_id == 1280116466431299664:
+            submission_type = "card"
+        elif message.channel.parent_id == 1280151904910966895:
+            submission_type = "spawn"
+        else:
+            await interaction.followup.send(
+                "This command must be invoked in a spawn or card submission channel.", ephemeral=True
+            )
+            return
+        try:
+            # get message thread then thrad title
+            thread = await interaction.guild.fetch_channel(message.channel.id)
+            ball_name = thread.name
+
+            ball = await Ball.get(country=ball_name)
+        except DoesNotExist:
+            await interaction.followup.send(
+                "The message you replied to is not a countryball.", ephemeral=True
+            )
+            return
+        if not message.attachments:
+            await interaction.followup.send(
+                    "You must attach an image to the message.", ephemeral=True
+            )
+            return
+        try:
+            path = await save_file(message.attachments[0])
+        except Exception as e:
+            log.exception("Failed saving file when updating countryball artwork", exc_info=True)
+            await interaction.followup.send(
+                f"Failed saving the attached file: {message.attachments[0].url}.\n"
+                f"Partial error: {', '.join(str(x) for x in e.args)}\n"
+                "The full error is in the bot logs."
+            )
+            return
+        _credits = ball.credits.split(",")
+        if len(_credits) != 2:
+            await interaction.followup.send(
+                "The credits for this countryball are not formatted correctly. Please fix it on the panel first", ephemeral=True
+            )
+            return
+        if submission_type == "card":
+            ball.collection_card = "/" + str(path)
+            ball.credits = f"{_credits[0]}, {message.author.name} (card)"
+        else:
+            ball.wild_card = "/" + str(path)
+            ball.credits = f"{message.author.name} (spawn), {_credits[1]}"
+        await ball.save()
+        cog = self.bot.get_cog("IPC")
+        if cog:
+            await cog.handler("reload_cache", 0, {})
+        if thread.starter_message is None:
+            thread_starter = await thread.fetch_message(thread.id)
+        else:
+            thread_starter = thread.starter_message
+
+        file = discord.File(path)
+        await thread_starter.edit(
+            attachments=[file],
+        )
+        await message.add_reaction("✅")
+        role = interaction.guild.get_role(1060136184384335903)
+        member = await interaction.guild.fetch_member(message.author.id)
+        if role and member:
+            await member.add_roles(role)
+        await interaction.followup.send(
+            f"Artwork for {ball} updated.", ephemeral=True
+        )
+        try:
+            await member.send(f"Your artwork for {ball_name} {submission_type} has been accepted, thank you for your submission!")
+        except discord.Forbidden:
+            pass
+        await log_action(f"{interaction.user} updated artwork for {ball} ({ball.pk}) {submission_type}.", self.bot)
