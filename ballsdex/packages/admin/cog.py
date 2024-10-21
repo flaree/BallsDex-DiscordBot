@@ -209,7 +209,7 @@ class Admin(commands.GroupCog):
                             "The given guild could not be found.", ephemeral=True
                         )
                         return
-                    guild = Guild(*guild)
+                    guild = Guild(*guild[0])
                 else:
                     guild = self.bot.get_guild(int(guild_id))
             except ValueError:
