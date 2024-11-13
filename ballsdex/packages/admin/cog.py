@@ -27,7 +27,12 @@ from ballsdex.core.models import (
     TradeObject,
 )
 from ballsdex.core.utils.buttons import ConfirmChoiceView
-from ballsdex.core.utils.enums import DONATION_POLICY_MAP, PRIVATE_POLICY_MAP
+from ballsdex.core.utils.enums import (
+    DONATION_POLICY_MAP,
+    FRIEND_POLICY_MAP,
+    MENTION_POLICY_MAP,
+    PRIVATE_POLICY_MAP,
+)
 from ballsdex.core.utils.logging import log_action
 from ballsdex.core.utils.paginator import FieldPageSource, Pages, TextPageSource
 from ballsdex.core.utils.transformers import (
@@ -1069,8 +1074,10 @@ class Admin(commands.GroupCog):
             f"**{settings.collectible_name.title()} ID:** {ball.pk}\n"
             f"**Player:** {ball.player}\n"
             f"**Name:** {ball.countryball}\n"
+            f"**Attack:** {ball.attack}\n"
             f"**Attack bonus:** {ball.attack_bonus}\n"
             f"**Health bonus:** {ball.health_bonus}\n"
+            f"**Health:** {ball.health}\n"
             f"**Shiny:** {ball.shiny}\n"
             f"**Special:** {ball.special.name if ball.special else None}\n"
             f"**Caught at:** {format_dt(ball.catch_date, style='R')}\n"
@@ -1173,7 +1180,7 @@ class Admin(commands.GroupCog):
         percentage: int | None
             The percentage of countryballs to delete, if not all. Used for sanctions.
         """
-        player = await Player.get(discord_id=user.id)
+        player = await Player.get_or_none(discord_id=user.id)
         if not player:
             await interaction.response.send_message(
                 "The user you gave does not exist.", ephemeral=True
@@ -1193,7 +1200,11 @@ class Admin(commands.GroupCog):
                 f"Are you sure you want to delete {percentage}% of "
                 f"{user}'s {settings.plural_collectible_name}?"
             )
-        view = ConfirmChoiceView(interaction)
+        view = ConfirmChoiceView(
+            interaction,
+            accept_message=f"Confirmed, deleting the {settings.plural_collectible_name}...",
+            cancel_message="Request cancelled.",
+        )
         await interaction.followup.send(
             text,
             view=view,
@@ -1733,7 +1744,9 @@ class Admin(commands.GroupCog):
             title=f"{user} ({user.id})",
             description=(
                 f"**Privacy Policy:** {PRIVATE_POLICY_MAP[player.privacy_policy]}\n"
-                f"**Donation Policy:** {DONATION_POLICY_MAP[player.donation_policy]}"
+                f"**Donation Policy:** {DONATION_POLICY_MAP[player.donation_policy]}\n"
+                f"**Mention Policy:** {MENTION_POLICY_MAP[player.mention_policy]}\n"
+                f"**Friend Policy:** {FRIEND_POLICY_MAP[player.friend_policy]}"
             ),
             color=discord.Color.blurple(),
         )
@@ -1743,7 +1756,7 @@ class Admin(commands.GroupCog):
         )
         embed.add_field(
             name=f"Unique {settings.plural_collectible_name} caught ({days} days):",
-            value=len(set(total_user_balls)),
+            value=len(set([ball.countryball for ball in total_user_balls])),
         )
         embed.add_field(
             name=f"Total servers with {settings.plural_collectible_name} caught ({days} days):",

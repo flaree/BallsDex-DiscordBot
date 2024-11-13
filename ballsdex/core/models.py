@@ -410,6 +410,11 @@ class MentionPolicy(IntEnum):
     DENY = 2
 
 
+class FriendPolicy(IntEnum):
+    ALLOW = 1
+    DENY = 2
+
+
 class Player(models.Model):
     discord_id = fields.BigIntField(
         description="Discord user ID", unique=True, validators=[DiscordSnowflakeValidator()]
@@ -428,6 +433,11 @@ class Player(models.Model):
         MentionPolicy,
         description="How you want to handle mentions",
         default=MentionPolicy.ALLOW,
+    )
+    friend_policy = fields.IntEnumField(
+        FriendPolicy,
+        description="How you want to handle friend requests",
+        default=FriendPolicy.ALLOW,
     )
     balls: fields.BackwardFKRelation[BallInstance]
 

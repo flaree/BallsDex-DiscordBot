@@ -9,10 +9,23 @@ from discord.utils import format_dt
 from tortoise.exceptions import DoesNotExist
 from tortoise.expressions import Q
 
-from ballsdex.core.models import BallInstance, Block, DonationPolicy, Friendship, MentionPolicy
+from ballsdex.core.models import (
+    BallInstance,
+    Block,
+    DonationPolicy,
+    FriendPolicy,
+    Friendship,
+    MentionPolicy,
+)
 from ballsdex.core.models import Player as PlayerModel
 from ballsdex.core.models import PrivacyPolicy, Trade, TradeObject, balls
 from ballsdex.core.utils.buttons import ConfirmChoiceView
+from ballsdex.core.utils.enums import (
+    DONATION_POLICY_MAP,
+    FRIEND_POLICY_MAP,
+    MENTION_POLICY_MAP,
+    PRIVATE_POLICY_MAP,
+)
 from ballsdex.core.utils.paginator import FieldPageSource, Pages
 from ballsdex.settings import settings
 
@@ -27,17 +40,17 @@ class Player(commands.GroupCog):
 
     def __init__(self, bot: "BallsDexBot"):
         self.bot = bot
-        if not self.bot.intents.members:
-            self.__cog_app_commands_group__.get_command("privacy").parameters[  # type: ignore
-                0
-            ]._Parameter__parent.choices.pop()  # type: ignore
+        self.active_friend_requests = {}
+        if not self.bot.intents.members and self.__cog_app_commands_group__:
+            privacy_command = self.__cog_app_commands_group__.get_command("privacy")
+            if privacy_command:
+                privacy_command.parameters[0]._Parameter__parent.choices.pop()  # type: ignore
 
     friend = app_commands.Group(name="friend", description="Friend commands")
     blocked = app_commands.Group(name="block", description="Block commands")
-    donation = app_commands.Group(name="donation", description="Donation commands")
-    mention = app_commands.Group(name="mention", description="Mention commands")
+    policy = app_commands.Group(name="policy", description="Policy commands")
 
-    @app_commands.command()
+    @policy.command()
     @app_commands.choices(
         policy=[
             app_commands.Choice(name="Open Inventory", value=PrivacyPolicy.ALLOW),
@@ -67,7 +80,7 @@ class Player(commands.GroupCog):
             f"Your privacy policy has been set to **{policy.name}**.", ephemeral=True
         )
 
-    @donation.command(name="policy")
+    @policy.command()
     @app_commands.choices(
         policy=[
             app_commands.Choice(name="Accept all donations", value=DonationPolicy.ALWAYS_ACCEPT),
@@ -80,7 +93,7 @@ class Player(commands.GroupCog):
             ),
         ]
     )
-    async def donation_policy(self, interaction: discord.Interaction, policy: DonationPolicy):
+    async def donation(self, interaction: discord.Interaction, policy: DonationPolicy):
         """
         Change how you want to receive donations from /balls give
 
@@ -94,7 +107,8 @@ class Player(commands.GroupCog):
         if policy.value == DonationPolicy.ALWAYS_ACCEPT:
             await interaction.response.send_message(
                 "Setting updated, you will now receive all donated "
-                f"{settings.plural_collectible_name} immediately."
+                f"{settings.plural_collectible_name} immediately.",
+                ephemeral=True,
             )
         elif policy.value == DonationPolicy.REQUEST_APPROVAL:
             await interaction.response.send_message(
@@ -111,7 +125,7 @@ class Player(commands.GroupCog):
         elif policy.value == DonationPolicy.FRIENDS_ONLY:
             await interaction.response.send_message(
                 "Setting updated, you will now only receive donated "
-                f"{settings.collectible_name}s from players you have "
+                f"{settings.plural_collectible_name} from players you have "
                 "added as friends in the bot.",
                 ephemeral=True,
             )
@@ -120,14 +134,14 @@ class Player(commands.GroupCog):
             return
         await player.save()  # do not save if the input is invalid
 
-    @mention.command(name="policy")
+    @policy.command()
     @app_commands.choices(
         policy=[
             app_commands.Choice(name="Accept all mentions", value=MentionPolicy.ALLOW),
             app_commands.Choice(name="Deny all mentions", value=MentionPolicy.DENY),
         ]
     )
-    async def mention_policy(self, interaction: discord.Interaction, policy: MentionPolicy):
+    async def mention(self, interaction: discord.Interaction, policy: MentionPolicy):
         """
         Set your mention policy.
 
@@ -141,6 +155,30 @@ class Player(commands.GroupCog):
         await player.save()
         await interaction.response.send_message(
             f"Your mention policy has been set to **{policy.name.lower()}**.", ephemeral=True
+        )
+
+    @policy.command()
+    @app_commands.choices(
+        policy=[
+            app_commands.Choice(name="Accept all friend requests", value=FriendPolicy.ALLOW),
+            app_commands.Choice(name="Deny all friend requests", value=FriendPolicy.DENY),
+        ]
+    )
+    async def friends(self, interaction: discord.Interaction, policy: FriendPolicy):
+        """
+        Set your friend policy.
+
+        Parameters
+        ----------
+        policy: FriendPolicy
+            The new policy for friend requests.
+        """
+        player, _ = await PlayerModel.get_or_create(discord_id=interaction.user.id)
+        player.friend_policy = policy
+        await player.save()
+        await interaction.response.send_message(
+            f"Your friend request policy has been set to **{policy.name.lower()}**.",
+            ephemeral=True,
         )
 
     @app_commands.command()
@@ -184,6 +222,11 @@ class Player(commands.GroupCog):
                 "You cannot add a blacklisted user as a friend.", ephemeral=True
             )
             return
+        if player2.friend_policy == FriendPolicy.DENY:
+            await interaction.response.send_message(
+                "This user isn't accepting friend requests.", ephemeral=True
+            )
+            return
 
         blocked = await player1.is_blocked(player2)
         player2_blocked = await player2.is_blocked(player1)
@@ -207,19 +250,34 @@ class Player(commands.GroupCog):
                 "You are already friends with this user!", ephemeral=True
             )
             return
-        else:
-            view = ConfirmChoiceView(interaction, user=user)
-            await interaction.response.send_message(
-                f"{user.mention}, {interaction.user} has sent you a friend request!",
-                view=view,
-                allowed_mentions=discord.AllowedMentions(users=player2.can_be_mentioned),
-            )
-            await view.wait()
 
-            if not view.value:
-                return
-            else:
-                await Friendship.create(player1=player1, player2=player2)
+        if self.active_friend_requests.get((player1.discord_id, player2.discord_id), False):
+            await interaction.response.send_message(
+                "You already have an active friend request to this user!", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(thinking=True)
+        view = ConfirmChoiceView(
+            interaction,
+            user=user,
+            accept_message="Friend request accepted!",
+            cancel_message="Friend request declined.",
+        )
+        await interaction.followup.send(
+            f"{user.mention}, {interaction.user} has sent you a friend request!",
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=player2.can_be_mentioned),
+        )
+        self.active_friend_requests[(player1.discord_id, player2.discord_id)] = True
+        await view.wait()
+
+        if not view.value:
+            self.active_friend_requests[(player1.discord_id, player2.discord_id)] = False
+            return
+
+        await Friendship.create(player1=player1, player2=player2)
+        self.active_friend_requests[(player1.discord_id, player2.discord_id)] = False
 
     @friend.command(name="remove")
     async def friend_remove(self, interaction: discord.Interaction, user: discord.User):
@@ -266,6 +324,7 @@ class Player(commands.GroupCog):
         friendships = (
             await Friendship.filter(Q(player1=player) | Q(player2=player))
             .select_related("player1", "player2")
+            .order_by("since")
             .all()
         )
 
@@ -322,10 +381,20 @@ class Player(commands.GroupCog):
         if blocked:
             await interaction.followup.send("You have already blocked this user.", ephemeral=True)
             return
+        if self.active_friend_requests[(player1.discord_id, player2.discord_id)]:
+            await interaction.followup.send(
+                "You cannot block a user to whom you have sent an active friend request.",
+                ephemeral=True,
+            )
+            return
 
         friended = await player1.is_friend(player2)
         if friended:
-            view = ConfirmChoiceView(interaction)
+            view = ConfirmChoiceView(
+                interaction,
+                accept_message="User has been blocked.",
+                cancel_message=f"Request cancelled, {user.name} is still your friend.",
+            )
             await interaction.followup.send(
                 "This user is your friend, are you sure you want to block them?",
                 view=view,
@@ -383,7 +452,10 @@ class Player(commands.GroupCog):
         player, _ = await PlayerModel.get_or_create(discord_id=interaction.user.id)
 
         blocked_relations = (
-            await Block.filter(player1=player).select_related("player1", "player2").all()
+            await Block.filter(player1=player)
+            .select_related("player1", "player2")
+            .order_by("date")
+            .all()
         )
 
         if not blocked_relations:
@@ -418,9 +490,9 @@ class Player(commands.GroupCog):
         await pages.start(ephemeral=True)
 
     @app_commands.command()
-    async def stats(self, interaction: discord.Interaction):
+    async def info(self, interaction: discord.Interaction):
         """
-        View your statistics in the bot!
+        Display some of your info in the bot!
         """
         await interaction.response.defer(thinking=True, ephemeral=True)
         try:
@@ -428,9 +500,7 @@ class Player(commands.GroupCog):
                 "balls"
             )
         except DoesNotExist:
-            await interaction.followup.send(
-                "You haven't got any statistics to show!", ephemeral=True
-            )
+            await interaction.followup.send("You haven't got any info to show!", ephemeral=True)
             return
         ball = await BallInstance.filter(player=player).prefetch_related("special", "trade_player")
 
@@ -456,13 +526,28 @@ class Player(commands.GroupCog):
         trades = await Trade.filter(
             Q(player1__discord_id=interaction.user.id) | Q(player2__discord_id=interaction.user.id)
         ).count()
+        friends = await Friendship.filter(
+            Q(player1__discord_id=interaction.user.id) | Q(player2__discord_id=interaction.user.id)
+        ).count()
+
+        blocks = await Block.filter(
+            Q(player1__discord_id=interaction.user.id) | Q(player2__discord_id=interaction.user.id)
+        ).count()
 
         embed = discord.Embed(
-            title=f"**{user.display_name.title()}'s {settings.bot_name.title()} Stats**",
+            title=f"**{user.display_name.title()}'s {settings.bot_name.title()} Info**",
             color=discord.Color.blurple(),
         )
         embed.description = (
-            "Here are your current statistics in the bot!\n\n"
+            "Here are your statistics and settings in the bot!\n"
+            "## Player Info\n"
+            f"**Privacy Policy:** {PRIVATE_POLICY_MAP[player.privacy_policy]}\n"
+            f"**Donation Policy:** {DONATION_POLICY_MAP[player.donation_policy]}\n"
+            f"**Mention Policy:** {MENTION_POLICY_MAP[player.mention_policy]}\n"
+            f"**Friend Policy:** {FRIEND_POLICY_MAP[player.friend_policy]}\n"
+            f"**Amount of Friends:** {friends}\n"
+            f"**Amount of Blocked Users:** {blocks}\n"
+            "## Player Stats\n"
             f"**Completion:** {completion_percentage}\n"
             f"**{settings.collectible_name.title()}s Owned:** {len(balls_owned):,}\n"
             f"**Caught {settings.collectible_name.title()}s Owned**: {len(caught_owned):,}\n"
