@@ -56,6 +56,8 @@ class Settings:
         List of roles that have full access to the /admin command
     admin_role_ids: list[int]
         List of roles that have partial access to the /admin command (only blacklist and guilds)
+    spawn_manager: str
+        Python path to a class implementing `BaseSpawnManager`, handling cooldowns and anti-cheat
     """
 
     bot_token: str = ""
@@ -98,6 +100,7 @@ class Settings:
 
     redis_db: int = 0
     redis_subscribe: str = "balls"
+    spawn_manager: str = "ballsdex.packages.countryballs.spawn.SpawnManager"
 
 
 settings = Settings()
@@ -139,6 +142,10 @@ def read_settings(path: "Path"):
     settings.max_favorites = content.get("max-favorites", 50)
     settings.max_attack_bonus = content.get("max-attack-bonus", 20)
     settings.max_health_bonus = content.get("max-health-bonus", 20)
+
+    settings.spawn_manager = content.get(
+        "spawn-manager", "ballsdex.packages.countryballs.spawn.SpawnManager"
+    )
     log.info("Settings loaded.")
 
 
@@ -229,6 +236,8 @@ prometheus:
   enabled: false
   host: "0.0.0.0"
   port: 15260
+
+spawn-manager: ballsdex.packages.countryballs.spawn.SpawnManager
   """  # noqa: W291
     )
 
@@ -242,6 +251,7 @@ def update_settings(path: "Path"):
     add_max_attack = "max-attack-bonus" not in content
     add_max_health = "max-health-bonus" not in content
     add_plural_collectible = "plural-collectible-name" not in content
+    add_spawn_manager = "spawn-manager" not in content
 
     for line in content.splitlines():
         if line.startswith("owners:"):
@@ -290,5 +300,21 @@ max-health-bonus: 20
 plural-collectible-name: countryballs
 """
 
-    if any((add_owners, add_config_ref)):
+    if add_spawn_manager:
+        content += """
+# define a custom spawn manager implementation
+spawn-manager: ballsdex.packages.countryballs.spawn.SpawnManager
+"""
+
+    if any(
+        (
+            add_owners,
+            add_config_ref,
+            add_max_favorites,
+            add_max_attack,
+            add_max_health,
+            add_plural_collectible,
+            add_spawn_manager,
+        )
+    ):
         path.write_text(content)
