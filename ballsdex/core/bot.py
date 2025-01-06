@@ -48,8 +48,6 @@ if TYPE_CHECKING:
 log = logging.getLogger("ballsdex.core.bot")
 http_counter = Histogram("discord_http_requests", "HTTP requests", ["key", "code"])
 
-PACKAGES = ["config", "players", "countryballs", "info", "admin", "trade", "balls", "ipc"]
-
 
 def owner_check(ctx: commands.Context[BallsDexBot]):
     return ctx.bot.is_owner(ctx.author)
@@ -97,16 +95,20 @@ async def on_request_end(
 
 
 class CommandTree(app_commands.CommandTree):
+    disable_time_check: bool = False
+
     async def interaction_check(self, interaction: discord.Interaction[BallsDexBot], /) -> bool:
         # checking if the moment we receive this interaction isn't too late already
         # there is a 3 seconds limit for initial response, taking a little margin into account
         # https://discord.com/developers/docs/interactions/receiving-and-responding#responding-to-an-interaction
-        delta = datetime.now(tz=interaction.created_at.tzinfo) - interaction.created_at
-        if delta.total_seconds() >= 2.8:
-            log.warning(
-                f"Skipping interaction {interaction.id}, running {delta.total_seconds()}s late."
-            )
-            return False
+        if not self.disable_time_check:
+            delta = datetime.now(tz=interaction.created_at.tzinfo) - interaction.created_at
+            if delta.total_seconds() >= 2.8:
+                log.warning(
+                    f"Skipping interaction {interaction.id}, "
+                    f"running {delta.total_seconds()}s late."
+                )
+                return False
 
         bot = interaction.client
         if not bot.is_ready():
@@ -129,6 +131,8 @@ class BallsDexBot(commands.AutoShardedBot):
         self,
         command_prefix: PrefixType[BallsDexBot],
         disable_messsage_content: bool = False,
+        disable_time_check: bool = False,
+        skip_tree_sync: bool = False,
         dev: bool = False,
         **options,
     ):
@@ -153,6 +157,8 @@ class BallsDexBot(commands.AutoShardedBot):
             options["http_trace"] = trace
 
         super().__init__(command_prefix, intents=intents, tree_cls=CommandTree, **options)
+        self.tree.disable_time_check = disable_time_check  # type: ignore
+        self.skip_tree_sync = skip_tree_sync
 
         self.dev = dev
         self.prometheus_server: PrometheusServer | None = None
@@ -161,6 +167,7 @@ class BallsDexBot(commands.AutoShardedBot):
         self.add_check(owner_check)  # Only owners are able to use text commands
 
         self._shutdown = 0
+        self.startup_time: datetime | None = None
         self.blacklist: set[int] = set()
         self.blacklist_guild: set[int] = set()
         self.catch_log: set[int] = set()
@@ -283,6 +290,9 @@ class BallsDexBot(commands.AutoShardedBot):
         if self.cogs != {}:
             return  # bot is reconnecting, no need to setup again
 
+        if self.startup_time is None:
+            self.startup_time = datetime.now()
+
         assert self.user
         log.info(f"Successfully logged in as {self.user} ({self.user.id})!")
 
@@ -315,13 +325,15 @@ class BallsDexBot(commands.AutoShardedBot):
             await self.add_cog(Dev(self))
 
         loaded_packages = []
-        for package in PACKAGES:
+        for package in settings.packages:
+            package_name = package.replace("ballsdex.packages.", "")
+
             try:
-                await self.load_extension("ballsdex.packages." + package)
+                await self.load_extension(package)
             except Exception:
-                log.error(f"Failed to load package {package}", exc_info=True)
+                log.error(f"Failed to load package {package_name}", exc_info=True)
             else:
-                loaded_packages.append(package)
+                loaded_packages.append(package_name)
         if loaded_packages:
             log.info(f"Packages loaded: {', '.join(loaded_packages)}")
         else:
@@ -331,18 +343,17 @@ class BallsDexBot(commands.AutoShardedBot):
         log.warning(f"Waiting {sleep_delay} seconds for other clusters to sync commands.")
         await asyncio.sleep(sleep_delay)
 
-        synced_commands = await self.tree.sync()
-        grammar = "" if synced_commands == 1 else "s"
-        if synced_commands:
-            log.info(f"Synced {len(synced_commands)} command{grammar}.")
+        if not self.skip_tree_sync:
+            synced_commands = await self.tree.sync()
+            log.info(f"Synced {len(synced_commands)} commands.")
             try:
                 self.assign_ids_to_app_commands(synced_commands)
             except Exception:
                 log.error("Failed to assign IDs to app commands", exc_info=True)
         else:
-            log.info("No command to sync.")
+            log.warning("Skipping command synchronization.")
 
-        if "admin" in PACKAGES:
+        if not self.skip_tree_sync and "ballsdex.packages.admin" in settings.packages:
             for guild_id in settings.admin_guild_ids:
                 guild = self.get_guild(guild_id)
                 if not guild:
@@ -503,6 +514,12 @@ class BallsDexBot(commands.AutoShardedBot):
                 "An error occured when running the command. Contact support if this persists."
             )
             return
+
+        if isinstance(
+            error, (app_commands.CommandNotFound, app_commands.CommandSignatureMismatch)
+        ):
+            await send("Commands desynchronizeded, contact support to fix this.")
+            log.error(error.args[0])
 
         await send("An error occured when running the command. Contact support if this persists.")
         log.error("Unknown error in interaction", exc_info=error)

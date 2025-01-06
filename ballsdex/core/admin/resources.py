@@ -109,6 +109,7 @@ class SpecialResource(Model):
         "emoji",
         "tradeable",
         "hidden",
+        "credits",
     ]
 
     async def get_actions(self, request: Request) -> List[Action]:
@@ -206,31 +207,36 @@ class BallResource(Model):
             name="emoji_id",
             label="Emoji",
             display=Emoji(),
+            input_=inputs.Input(
+                help_text="Emoji ID of this ball. Application emojis not supported. "
+                "Send \\:emoji-name: on Discord to obtain the ID."
+            ),
         ),
         Field(
             name="wild_card",
             label="Wild card",
             display=displays.Image(width="40"),
-            input_=inputs.Image(upload=upload, null=True),
+            input_=inputs.Image(
+                upload=upload,
+                null=True,
+                help_text="The file uploaded when this ball spawns. You certify that you have "
+                "the permission from the copyright holder to use this file.",
+            ),
         ),
         Field(
             name="collection_card",
             label="Collection card (16:9 ratio)",
             display=displays.Image(width="40"),
-            input_=inputs.Image(upload=upload, null=True),
+            input_=inputs.Image(
+                upload=upload,
+                null=True,
+                help_text="The image used to generate the collection card. You certify that "
+                "you have the permission from the copyright holder to use this file.",
+            ),
         ),
-        Field(
-            name="credits",
-            label="Image credits",
-        ),
-        Field(
-            name="capacity_name",
-            label="Capacity name",
-        ),
-        Field(
-            name="capacity_description",
-            label="Capacity description",
-        ),
+        "credits",
+        "capacity_name",
+        "capacity_description",
     ]
 
     async def get_actions(self, request: Request) -> List[Action]:
@@ -262,7 +268,6 @@ class BallInstanceResource(Model):
         ),
         filters.ForeignKey(model=Ball, name="ball", label="Ball"),
         filters.ForeignKey(model=Special, name="special", label="Special"),
-        filters.Boolean(name="shiny", label="Shiny"),
         filters.Boolean(name="favorite", label="Favorite"),
         filters.Search(
             name="player__discord_id",
@@ -282,7 +287,6 @@ class BallInstanceResource(Model):
         "player",
         "catch_date",
         "server_id",
-        "shiny",
         "special",
         "favorite",
         "health_bonus",

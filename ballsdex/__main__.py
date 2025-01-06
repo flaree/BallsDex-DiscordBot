@@ -41,6 +41,8 @@ class CLIFlags(argparse.Namespace):
     reset_settings: bool
     disable_rich: bool
     disable_message_content: bool
+    disable_time_check: bool
+    skip_tree_sync: bool
     debug: bool
     dev: bool
 
@@ -63,6 +65,19 @@ def parse_cli_flags(arguments: list[str]) -> CLIFlags:
         "--disable-message-content",
         action="store_true",
         help="Disable usage of message content intent through the bot",
+    )
+    parser.add_argument(
+        "--disable-time-check",
+        action="store_true",
+        help="Disables the 3 seconds delay check on interactions. Use this if you're getting a "
+        "lot of skipped interactions warning due to your PC's internal clock.",
+    )
+    parser.add_argument(
+        "--skip-tree-sync",
+        action="store_true",
+        help="Does not sync application commands to Discord. Significant startup speedup and "
+        "avoids ratelimits, but risks of having desynced commands after updates. This is always "
+        "enabled with clustering.",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logs")
     parser.add_argument("--dev", action="store_true", help="Enable developer mode")
@@ -294,7 +309,6 @@ async def main(
             cluster_id=cluster_id,
             cluster_count=cluster_count,
             cluster_name=cluster_name,
-            disable_messsage_content=False,
         )
 
         # exc_handler = functools.partial(global_exception_handler, bot)

@@ -13,6 +13,7 @@ from ballsdex.core.models import BallInstance, Player
 from ballsdex.core.models import Trade as TradeModel
 from ballsdex.core.utils.buttons import ConfirmChoiceView
 from ballsdex.core.utils.paginator import Pages
+from ballsdex.core.utils.sorting import SortingChoices, sort_balls
 from ballsdex.core.utils.transformers import (
     BallEnabledTransform,
     BallInstanceTransform,
@@ -166,7 +167,6 @@ class Trade(commands.GroupCog):
         interaction: discord.Interaction,
         countryball: BallInstanceTransform,
         special: SpecialEnabledTransform | None = None,
-        shiny: bool | None = None,
     ):
         """
         Add a countryball to the ongoing trade.
@@ -177,8 +177,6 @@ class Trade(commands.GroupCog):
             The countryball you want to add to your proposal
         special: Special
             Filter the results of autocompletion to a special event. Ignored afterwards.
-        shiny: bool
-            Filter the results of autocompletion to shinies. Ignored afterwards.
         """
         if not countryball:
             return
@@ -240,7 +238,7 @@ class Trade(commands.GroupCog):
         self,
         interaction: discord.Interaction,
         countryball: BallEnabledTransform | None = None,
-        shiny: bool | None = None,
+        sort: SortingChoices | None = None,
         special: SpecialEnabledTransform | None = None,
     ):
         """
@@ -250,8 +248,8 @@ class Trade(commands.GroupCog):
         ----------
         countryball: Ball
             The countryball you would like to filter the results to
-        shiny: bool
-            Filter the results to shinies
+        sort: SortingChoices
+            Choose how countryballs are sorted. Can be used to show duplicates.
         special: Special
             Filter the results to a special event
         """
@@ -267,15 +265,14 @@ class Trade(commands.GroupCog):
                 ephemeral=True,
             )
             return
-        filters = {}
+        query = BallInstance.filter(player__discord_id=interaction.user.id)
         if countryball:
-            filters["ball"] = countryball
-        if shiny:
-            filters["shiny"] = shiny
+            query = query.filter(ball=countryball)
         if special:
-            filters["special"] = special
-        filters["player__discord_id"] = interaction.user.id
-        balls = await BallInstance.filter(**filters).prefetch_related("ball", "player")
+            query = query.filter(special=special)
+        if sort:
+            query = sort_balls(sort, query)
+        balls = await query
         if not balls:
             await interaction.followup.send(
                 f"No {settings.plural_collectible_name} found.", ephemeral=True
@@ -296,7 +293,6 @@ class Trade(commands.GroupCog):
         interaction: discord.Interaction,
         countryball: BallInstanceTransform,
         special: SpecialEnabledTransform | None = None,
-        shiny: bool | None = None,
     ):
         """
         Remove a countryball from what you proposed in the ongoing trade.
@@ -307,8 +303,6 @@ class Trade(commands.GroupCog):
             The countryball you want to remove from your proposal
         special: Special
             Filter the results of autocompletion to a special event. Ignored afterwards.
-        shiny: bool
-            Filter the results of autocompletion to shinies. Ignored afterwards.
         """
         if not countryball:
             return
@@ -362,27 +356,31 @@ class Trade(commands.GroupCog):
     async def history(
         self,
         interaction: discord.Interaction["BallsDexBot"],
-        sorting: app_commands.Choice[str],
+        sorting: app_commands.Choice[str] | None = None,
         trade_user: discord.User | None = None,
         days: Optional[int] = None,
         countryball: BallEnabledTransform | None = None,
+        special: SpecialEnabledTransform | None = None,
     ):
         """
         Show the history of your trades.
 
         Parameters
         ----------
-        sorting: str
-            The sorting order of the trades
+        sorting: str | None
+            The sorting order of the trades.
         trade_user: discord.User | None
-            The user you want to see your trade history with
+            The user you want to see your trade history with.
         days: Optional[int]
             Retrieve trade history from last x days.
         countryball: BallEnabledTransform | None
             The countryball you want to filter the trade history by.
+        special: SpecialEnabledTransform | None
+            The special you want to filter the trade history by.
         """
         await interaction.response.defer(ephemeral=True, thinking=True)
         user = interaction.user
+        sort_value = sorting.value if sorting else "-date"
 
         if days is not None and days < 0:
             await interaction.followup.send(
@@ -407,9 +405,14 @@ class Trade(commands.GroupCog):
 
         if countryball:
             queryset = queryset.filter(Q(tradeobjects__ballinstance__ball=countryball)).distinct()
+        if special:
+            queryset = queryset.filter(Q(tradeobjects__ballinstance__special=special)).distinct()
 
-        history = await queryset.order_by(sorting.value).prefetch_related(
-            "player1", "player2", "tradeobjects__ballinstance__ball"
+        history = await queryset.order_by(sort_value).prefetch_related(
+            "player1",
+            "player2",
+            "tradeobjects__ballinstance__ball",
+            "tradeobjects__ballinstance__special",
         )
 
         if not history:

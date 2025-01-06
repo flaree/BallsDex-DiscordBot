@@ -36,12 +36,11 @@ class CountryballsSelector(Pages):
             else:
                 emoji = self.bot.get_emoji(int(ball.countryball.emoji_id))
             favorite = "❤️ " if ball.favorite else ""
-            shiny = "✨ " if ball.shiny else ""
             special = ball.special_emoji(self.bot, True)
             custom_art = "🖼️" if "card" in ball.extra_data else ""
             options.append(
                 discord.SelectOption(
-                    label=f"{favorite}{shiny}{special}#{custom_art}{ball.pk:0X} {ball.countryball.country}",
+                    label=f"{favorite}{special}#{custom_art}{ball.pk:0X} {ball.countryball.country}",
                     description=(
                         f"ATK: {ball.attack}({ball.attack_bonus:+d}%) "
                         f"• HP: {ball.health}({ball.health_bonus:+d}%) • "
