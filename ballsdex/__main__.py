@@ -1,13 +1,11 @@
 import argparse
 import asyncio
-import functools
 import logging
 import logging.handlers
 import os
 import sys
 import time
 from pathlib import Path
-from signal import SIGTERM
 
 import discord
 import yarl
@@ -19,7 +17,7 @@ from tortoise import Tortoise
 from ballsdex import __version__ as bot_version
 from ballsdex.core.bot import BallsDexBot
 from ballsdex.logger import init_logger
-from ballsdex.settings import read_settings, settings, update_settings, write_default_settings
+from ballsdex.settings import read_settings, settings, write_default_settings
 
 discord.voice_client.VoiceClient.warn_nacl = False  # disable PyNACL warning
 log = logging.getLogger("ballsdex")
@@ -237,9 +235,12 @@ class RemoveWSBehindMsg(logging.Filter):
         return True
 
 
-async def init_tortoise(db_url: str):
+async def init_tortoise(db_url: str, *, skip_migrations: bool = False):
     log.debug(f"Database URL: {db_url}")
     await Tortoise.init(config=TORTOISE_ORM)
+
+    if skip_migrations:
+        return
 
     # migrations
     command = Command(TORTOISE_ORM, app="models")
