@@ -7,6 +7,7 @@ import discord
 from ballsdex.core.models import BallInstance
 from ballsdex.core.utils import menus
 from ballsdex.core.utils.paginator import Pages
+from ballsdex.settings import settings
 
 if TYPE_CHECKING:
     from ballsdex.core.bot import BallsDexBot
@@ -35,7 +36,7 @@ class CountryballsSelector(Pages):
                 emoji = ball.ball.capacity_logic["emoji"]
             else:
                 emoji = self.bot.get_emoji(int(ball.countryball.emoji_id))
-            favorite = "❤️ " if ball.favorite else ""
+            favorite = f"{settings.favorited_collectible_emoji} " if ball.favorite else ""
             special = ball.special_emoji(self.bot, True)
             custom_art = "🖼️" if "card" in ball.extra_data else ""
             options.append(
