@@ -79,6 +79,11 @@ class CountryballNamePrompt(Modal, title=f"Catch this {settings.collectible_name
                     f"This is a **new {settings.collectible_name}** "
                     "that has been added to your completion!"
                 )
+            if datetime.now().strftime("%m-%d") in self.ball.model.capacity_logic and (
+                self.ball.model.capacity_logic[datetime.now().strftime("%m-%d")].get("catch")
+                is not None
+            ):
+                special += f"{self.ball.model.capacity_logic[datetime.now().strftime('%m-%d')]['catch']}\n"
             await interaction.followup.send(
                 f"{interaction.user.mention} You caught **{self.ball.name}!** "
                 f"`(#{ball.pk:0X}, {ball.attack_bonus:+}%/{ball.health_bonus:+}%)`\n\n"
@@ -130,6 +135,10 @@ class CountryballNamePrompt(Modal, title=f"Catch this {settings.collectible_name
             special = random.choices(population=population + [None], weights=weights, k=1)[0]
 
         is_new = not await BallInstance.filter(player=player, ball=self.ball.model).exists()
+        if datetime.now().strftime("%m-%d") in self.ball.model.capacity_logic:
+            extra_data = self.ball.model.capacity_logic[datetime.now().strftime("%m-%d")]
+        else:
+            extra_data = {}
         ball = await BallInstance.create(
             ball=self.ball.model,
             player=player,
@@ -138,6 +147,7 @@ class CountryballNamePrompt(Modal, title=f"Catch this {settings.collectible_name
             health_bonus=bonus_health,
             server_id=user.guild.id,
             spawned_time=self.ball.time,
+            extra_data=extra_data,
         )
         if user.id in bot.catch_log:
             log.info(

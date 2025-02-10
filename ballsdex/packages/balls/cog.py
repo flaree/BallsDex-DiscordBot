@@ -169,7 +169,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
             return
 
         await player.fetch_related("balls")
-        query = player.balls.all()
+        query = player.balls.all().prefetch_related("ball")
         if countryball:
             query = query.filter(ball__id=countryball.pk)
         if special:
@@ -269,6 +269,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
         filters = {"player__discord_id": user_obj.id, "ball__enabled": True}
         if special:
             filters["special"] = special
+            filters["ball__created_at__lt"] = special.end_date
             bot_countryballs = {
                 x: y.capacity_logic["emoji"] if self.bot.cluster_count > 1 else y.emoji_id
                 for x, y in balls.items()

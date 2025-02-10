@@ -38,6 +38,7 @@ def draw_card(ball_instance: "BallInstance", media_path: str = "./admin_panel/me
     ball = ball_instance.countryball
     ball_health = (237, 115, 101, 255)
     ball_credits = ball.credits
+    extra_data = ball_instance.extra_data or {}
     card_name = ball.cached_regime.name
     if special_image := ball_instance.special_card:
         card_name = getattr(ball_instance.specialcard, card_name)
@@ -112,8 +113,10 @@ def draw_card(ball_instance: "BallInstance", media_path: str = "./admin_panel/me
         stroke_width=0,
         stroke_fill=(255, 255, 255, 255),
     )
-
-    artwork = Image.open(media_path + ball.collection_card).convert("RGBA")
+    if extra_data.get("card"): # type: ignore
+        artwork = Image.open(media_path + extra_data["card"]).convert("RGBA") # type: ignore
+    else:
+        artwork = Image.open(media_path + ball.collection_card).convert("RGBA")
     image.paste(ImageOps.fit(artwork, artwork_size), CORNERS[0])  # type: ignore
 
     if icon:
