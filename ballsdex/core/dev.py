@@ -219,9 +219,14 @@ class Dev(commands.Cog):
         token = ctx.bot.http.token
         return re.sub(re.escape(token), "[EXPUNGED]", input_, re.I)
 
-    def get_environment(self, ctx: commands.Context | None) -> dict:
+    def get_environment(self, ctx: commands.Context) -> dict:
         env = {
             "bot": self.bot,
+            "ctx": ctx,
+            "channel": ctx.channel,
+            "author": ctx.author,
+            "guild": ctx.guild,
+            "message": ctx.message,
             "asyncio": asyncio,
             "aiohttp": aiohttp,
             "discord": discord,
