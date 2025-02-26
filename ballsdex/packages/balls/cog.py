@@ -258,20 +258,14 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
                 return
         # Filter disabled balls, they do not count towards progression
         # Only ID and emoji is interesting for us
-        if self.bot.cluster_count > 1:
-            bot_countryballs = {
-                x: y.capacity_logic["emoji"] for x, y in balls.items() if y.enabled
-            }
-        else:
-            bot_countryballs = {x: y.emoji_id for x, y in balls.items() if y.enabled}
+        bot_countryballs = {x: y.emoji_id for x, y in balls.items() if y.enabled}
 
         # Set of ball IDs owned by the player
         filters = {"player__discord_id": user_obj.id, "ball__enabled": True}
         if special:
             filters["special"] = special
-            filters["ball__created_at__lt"] = special.end_date
             bot_countryballs = {
-                x: y.capacity_logic["emoji"] if self.bot.cluster_count > 1 else y.emoji_id
+                x: y.emoji_id
                 for x, y in balls.items()
                 if y.enabled and (special.end_date is None or y.created_at < special.end_date)
             }
@@ -485,10 +479,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
 
             countryball.favorite = True  # type: ignore
             await countryball.save()
-            if self.bot.cluster_count > 1:
-                emoji = countryball.countryball.capacity_logic["emoji"]
-            else:
-                emoji = self.bot.get_emoji(countryball.countryball.emoji_id) or ""
+            emoji = self.bot.get_emoji(countryball.countryball.emoji_id) or ""
             await interaction.response.send_message(
                 f"{emoji} `#{countryball.pk:0X}` {countryball.countryball.country} "
                 f"is now a favorite {settings.collectible_name}!",
@@ -498,10 +489,7 @@ class Balls(commands.GroupCog, group_name=settings.players_group_cog_name):
         else:
             countryball.favorite = False  # type: ignore
             await countryball.save()
-            if self.bot.cluster_count > 1:
-                emoji = countryball.countryball.capacity_logic["emoji"]
-            else:
-                emoji = self.bot.get_emoji(countryball.countryball.emoji_id) or ""
+            emoji = self.bot.get_emoji(countryball.countryball.emoji_id) or ""
             await interaction.response.send_message(
                 f"{emoji} `#{countryball.pk:0X}` {countryball.countryball.country} "
                 f"isn't a favorite {settings.collectible_name} anymore.",

@@ -53,11 +53,8 @@ class Info(commands.Cog):
         emotes: list[discord.Emoji] = []
 
         for ball in balls:
-            if "emoji" in ball.capacity_logic:
-                emotes.append(ball.capacity_logic["emoji"])
-            else:
-                if emoji := self.bot.get_emoji(ball.emoji_id):
-                    emotes.append(emoji)
+            if emoji := self.bot.get_emoji(ball.emoji_id):
+                emotes.append(emoji)
 
         return emotes
 
