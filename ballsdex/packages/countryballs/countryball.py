@@ -1,12 +1,12 @@
 import logging
 import random
 import string
-from datetime import datetime
+from io import BytesIO
 
 import discord
+from PIL import Image
+from tortoise.timezone import now as tortoise_now
 
-from PIL import Image, ImageDraw, ImageFont
-from io import BytesIO
 from ballsdex.core.models import Ball, Special, balls
 from ballsdex.packages.countryballs.components import CatchView
 from ballsdex.settings import settings
@@ -21,7 +21,7 @@ class CountryBall:
         self.algo: str | None = None
         self.message: discord.Message = discord.utils.MISSING
         self.caught = False
-        self.time = datetime.now()
+        self.time = tortoise_now()
         self.special: Special | None = None
         self.atk_bonus: int | None = None
         self.hp_bonus: int | None = None
@@ -59,14 +59,14 @@ class CountryBall:
         extension = self.model.wild_card.split(".")[-1]
         root = "./admin_panel/media/"
         if self.model.capacity_logic and self.model.capacity_logic.get(
-            datetime.now().strftime("%m-%d")
+            tortoise_now().strftime("%m-%d")
         ):
-            if self.model.capacity_logic[datetime.now().strftime("%m-%d")].get("spawn"):
-                extension = self.model.capacity_logic[datetime.now().strftime("%m-%d")]["spawn"].split(
-                    "."
-                )[-1]
+            if self.model.capacity_logic[tortoise_now().strftime("%m-%d")].get("spawn"):
+                extension = self.model.capacity_logic[tortoise_now().strftime("%m-%d")][
+                    "spawn"
+                ].split(".")[-1]
                 file_location = (
-                    root + self.model.capacity_logic[datetime.now().strftime("%m-%d")]["spawn"]
+                    root + self.model.capacity_logic[tortoise_now().strftime("%m-%d")]["spawn"]
                 )
             else:
                 extension = self.model.wild_card.split(".")[-1]
@@ -99,13 +99,14 @@ class CountryBall:
 
 def genData(data):
 
-        # list of binary codes
-        # of given data
-        newd = []
+    # list of binary codes
+    # of given data
+    newd = []
 
-        for i in data:
-            newd.append(format(ord(i), '08b'))
-        return newd
+    for i in data:
+        newd.append(format(ord(i), "08b"))
+    return newd
+
 
 # Pixels are modified according to the
 # 8-bit binary data and finally returned
@@ -118,17 +119,18 @@ def modPix(pix, data):
     for i in range(lendata):
 
         # Extracting 3 pixels at a time
-        pix = [value for value in imdata.__next__()[:3] +
-                                imdata.__next__()[:3] +
-                                imdata.__next__()[:3]]
+        pix = [
+            value
+            for value in imdata.__next__()[:3] + imdata.__next__()[:3] + imdata.__next__()[:3]
+        ]
         # Pixel value should be made
         # odd for 1 and even for 0
         for j in range(0, 8):
-            if (datalist[i][j] == '0' and pix[j]% 2 != 0):
+            if datalist[i][j] == "0" and pix[j] % 2 != 0:
                 pix[j] -= 1
 
-            elif (datalist[i][j] == '1' and pix[j] % 2 == 0):
-                if(pix[j] != 0):
+            elif datalist[i][j] == "1" and pix[j] % 2 == 0:
+                if pix[j] != 0:
                     pix[j] -= 1
                 else:
                     pix[j] += 1
@@ -138,20 +140,21 @@ def modPix(pix, data):
         # whether to stop ot read further.
         # 0 means keep reading; 1 means thec
         # message is over.
-        if (i == lendata - 1):
-            if (pix[-1] % 2 == 0):
-                if(pix[-1] != 0):
+        if i == lendata - 1:
+            if pix[-1] % 2 == 0:
+                if pix[-1] != 0:
                     pix[-1] -= 1
                 else:
                     pix[-1] += 1
         else:
-            if (pix[-1] % 2 != 0):
+            if pix[-1] % 2 != 0:
                 pix[-1] -= 1
 
         pix = tuple(pix)
         yield pix[0:3]
         yield pix[3:6]
         yield pix[6:9]
+
 
 def encode_enc(newimg, data):
     w = newimg.size[0]
@@ -161,26 +164,27 @@ def encode_enc(newimg, data):
 
         # Putting modified pixels in the new image
         newimg.putpixel((x, y), pixel)
-        if (x == w - 1):
+        if x == w - 1:
             x = 0
             y += 1
         else:
             x += 1
 
+
 def encode(file_location):
 
-    image = Image.open(file_location, 'r')
+    image = Image.open(file_location, "r")
     # generate random text
 
-    res = ''.join(random.choices(string.ascii_uppercase +
-                             string.digits, k=15))
-
+    res = "".join(random.choices(string.ascii_uppercase + string.digits, k=15))
 
     newimg = image.copy()
     # resize the image by random 1-10px
-    newimg = newimg.resize((newimg.size[0] + random.randint(1, 10), newimg.size[1] + random.randint(1, 10)))
+    newimg = newimg.resize(
+        (newimg.size[0] + random.randint(1, 10), newimg.size[1] + random.randint(1, 10))
+    )
     encode_enc(newimg, res)
     io = BytesIO()
-    newimg.save(io, format='PNG')
+    newimg.save(io, format="PNG")
     io.seek(0)
     return io

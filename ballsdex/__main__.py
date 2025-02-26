@@ -9,7 +9,6 @@ from pathlib import Path
 
 import discord
 import yarl
-from aerich import Command
 from discord.ext.commands import when_mentioned_or
 from rich import print
 from tortoise import Tortoise
@@ -26,7 +25,7 @@ TORTOISE_ORM = {
     "connections": {"default": os.environ.get("BALLSDEXBOT_DB_URL")},
     "apps": {
         "models": {
-            "models": ["ballsdex.core.models", "aerich.models"],
+            "models": ["ballsdex.core.models"],
             "default_connection": "default",
         },
     },
@@ -238,16 +237,6 @@ class RemoveWSBehindMsg(logging.Filter):
 async def init_tortoise(db_url: str, *, skip_migrations: bool = False):
     log.debug(f"Database URL: {db_url}")
     await Tortoise.init(config=TORTOISE_ORM)
-
-    if skip_migrations:
-        return
-
-    # migrations
-    command = Command(TORTOISE_ORM, app="models")
-    await command.init()
-    migrations = await command.upgrade()
-    if migrations:
-        log.info(f"Ran {len(migrations)} migrations: {', '.join(migrations)}")
 
 
 async def main(
