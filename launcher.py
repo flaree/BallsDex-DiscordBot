@@ -10,7 +10,6 @@ from time import time
 from typing import Iterable
 
 import aiohttp
-import async_timeout
 
 try:
     import orjson
@@ -285,7 +284,7 @@ class Main:
         try:
             await asyncio.wait([i.future for i in self.instances])
         except (Exception, asyncio.CancelledError):
-            async with async_timeout.timeout(15):
+            async with asyncio.timeout(15):
                 log.info("[MAIN] Shutdown requested, stopping clusters")
                 for instance in self.instances:
                     await instance.stop()
