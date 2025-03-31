@@ -1,4 +1,5 @@
 import zipfile
+from datetime import datetime, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
 
@@ -639,6 +640,45 @@ class Player(commands.GroupCog):
                 "Either you blocked me or you disabled DMs in this server.",
                 ephemeral=True,
             )
+
+    @app_commands.command()
+    async def consent(self, interaction: discord.Interaction):
+        """
+        Check and consent to the temporary extra privacy policy clause.
+        """
+        player, _ = await PlayerModel.get_or_create(discord_id=interaction.user.id)
+        embed = discord.Embed(
+            colour=discord.Colour.yellow(),
+            title="Temporary extra privacy policy clause",
+            url=settings.privacy_policy,
+            description="For a limited-time event, Ballsdex may read the content of your voice "
+            "messages. This has not been mentioned in the original privacy policy of the bot, so "
+            "you are asked to review this new temporary clause.\n\n"
+            "__Summary:__\n"
+            "- Only voice messages **replying to Ballsdex** may be read. No other voice message "
+            "will be read.\n"
+            "- The content of your voice messages may be sent to Google servers for processing\n"
+            "- After processing, the voice messages will be deleted. Neither Ballsdex or Google "
+            "will save your data.\n"
+            "- This clause will automatically drop after "
+            f"{format_dt(datetime(2025, 4, 2, tzinfo=timezone.utc))}\n"
+            f"You can review the full privacy policy [here]({settings.privacy_policy}).\n\n"
+            "Please accept or deny this extra clause. You are free to deny it, but you won't be "
+            "able to catch countryballs today.",
+        )
+        view = ConfirmChoiceView(
+            interaction,
+            accept_message="You opted-in the extra clause. You can use this command again to "
+            "revoke your approval.",
+            cancel_message="You didn't opt-in the extra clause. Ballsdex will not read your voice "
+            "messages.",
+        )
+        await interaction.response.send_message(embed=embed, view=view)
+        await view.wait()
+        if view.value is None:
+            return
+        player.extra_data["google-api-consent"] = view.value
+        await player.save(update_fields=("extra_data",))
 
 
 async def get_items_csv(player: PlayerModel) -> BytesIO:

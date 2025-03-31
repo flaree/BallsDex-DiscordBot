@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import logging
 import random
 import string
 from io import BytesIO
+from typing import Literal
 
 import discord
 from PIL import Image
@@ -12,9 +15,18 @@ from ballsdex.packages.countryballs.components import CatchView
 from ballsdex.settings import settings
 
 log = logging.getLogger("ballsdex.packages.countryballs")
+active_views: dict[int, CatchView] = {}
 
 
 class CountryBall:
+    @staticmethod
+    def active_view():
+        return active_views
+
+    @staticmethod
+    def add_view(message: discord.Message, view: CatchView):
+        active_views[message.id] = view
+
     def __init__(self, model: Ball):
         self.name = model.country
         self.model = model
@@ -35,7 +47,7 @@ class CountryBall:
         cb = random.choices(population=countryballs, weights=rarities, k=1)[0]
         return cls(cb)
 
-    async def spawn(self, channel: discord.TextChannel) -> bool:
+    async def spawn(self, channel: discord.TextChannel) -> Literal[False] | CatchView:
         """
         Spawn a countryball in a channel.
 
@@ -82,12 +94,14 @@ class CountryBall:
         try:
             permissions = channel.permissions_for(channel.guild.me)
             if permissions.attach_files and permissions.send_messages:
-                self.message = await channel.send(
+                view = CatchView(self)
+                self.message = view.message = await channel.send(
                     f"A wild {settings.collectible_name} appeared!",
-                    view=CatchView(self),
+                    view=view,
                     file=discord.File(img, filename=file_name),
                 )
-                return True
+                CountryBall.add_view(self.message, view)
+                return view
             else:
                 log.error("Missing permission to spawn ball in channel %s.", channel)
         except discord.Forbidden:
