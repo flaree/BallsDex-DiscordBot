@@ -6,22 +6,18 @@ import traceback
 from contextlib import redirect_stdout
 from logging import getLogger
 from uuid import uuid4
-from typing import TYPE_CHECKING, cast
+
 import discord
 from discord.ext import commands
 
 from ballsdex.core.models import BlacklistedGuild, BlacklistedID
 from ballsdex.settings import settings
 
-if TYPE_CHECKING:
-    from ballsdex.core.bot import BallsDexBot
-    from ballsdex.core.dev import Dev
-
 log = getLogger("ballsdex.packages.ipc.cog")
 
 
 class IPC(commands.Cog):
-    def __init__(self, bot: "BallsDexBot"):
+    def __init__(self, bot):
         self.bot = bot
         self.router = None
         self.pubsub = self.bot.redis.pubsub()
@@ -93,7 +89,7 @@ class IPC(commands.Cog):
         )
 
     async def evaluate(self, code, command_id: str):
-        cog = cast("Dev | None", self.bot.get_cog("Dev"))
+        cog = self.bot.get_cog("Dev")
         if not cog:
             return
         env = cog.get_environment(None)
@@ -247,25 +243,6 @@ class IPC(commands.Cog):
         await self.handler("reload_cache", 0, {})
         await ctx.message.add_reaction("✅")
 
-    @commands.command()
-    @commands.is_owner()
-    async def getbills(self, ctx: commands.Context):
-        """
-        Get the amount of GCP billed minutes
-        """
-        res: bytes | None = await self.bot.redis.get("gcp-stt-seconds")
-        if res is None:
-            await ctx.send("Redis value `billed_secs` not found.")
-            return
-        billed_secs = float(res.decode())
-        UNLOGGED_PRICE = 0.016
-        LOGGED_PRICE = 0.012
-        await ctx.send(
-            f"{round(billed_secs // 60)}:{round(billed_secs % 60):02} minutes billed since last restart.\n"
-            f"Unlogged price: ${billed_secs / 60 * UNLOGGED_PRICE}\n"
-            f"Logged price: ${billed_secs / 60 * LOGGED_PRICE}"
-        )
-
     async def reload_cache(self, command_id: str):
         await self.bot.load_cache()
         payload = {"output": "Cache reloaded.", "command_id": command_id}
@@ -322,7 +299,7 @@ class IPC(commands.Cog):
             settings.redis_db,
             json.dumps(payload),
         )
-
+    
     async def get_user(self, user_id, command_id: str):
         user = self.bot.get_user(user_id)
         if user is None:
@@ -333,7 +310,7 @@ class IPC(commands.Cog):
             settings.redis_db,
             json.dumps(payload),
         )
-
+    
     async def get_channel(self, channel_id, command_id: str):
         channel = self.bot.get_channel(channel_id)
         if channel is None:

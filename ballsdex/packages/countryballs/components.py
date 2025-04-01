@@ -185,7 +185,6 @@ class CatchView(View):
     def __init__(self, ball: "CountryBall"):
         super().__init__()
         self.ball = ball
-        self.message: discord.Message
 
     async def interaction_check(self, interaction: discord.Interaction["BallsDexBot"], /) -> bool:
         return await interaction.client.blacklist_check(interaction)
@@ -200,10 +199,6 @@ class CatchView(View):
 
     @button(style=discord.ButtonStyle.primary, label="Catch me!")
     async def catch_button(self, interaction: discord.Interaction["BallsDexBot"], button: Button):
-        await interaction.response.send_message(
-            "Nuh uh, I hate keyboards, reply with a voice message instead", ephemeral=True
-        )
-        return
         if self.ball.caught:
             await interaction.response.send_message("I was caught already!", ephemeral=True)
         else:
