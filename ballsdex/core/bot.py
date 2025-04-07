@@ -8,7 +8,7 @@ import os
 import time
 import types
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Self, cast
 
 import aiohttp
 import discord
@@ -178,7 +178,7 @@ class BallsDexBot(commands.AutoShardedBot):
         self.command_log: set[int] = set()
         self.locked_balls = TTLCache(maxsize=99999, ttl=60 * 30)
 
-        self.owner_ids: set
+        self.owner_ids: set[int]
         self.redis: aioredis.Redis
         self.cluster_id = options.get("cluster_id", 0)
         self.cluster_name = options.get("cluster_name", "main")
@@ -313,7 +313,7 @@ class BallsDexBot(commands.AutoShardedBot):
             if settings.team_owners:
                 self.owner_ids.update(m.id for m in self.application.team.members)
             else:
-                self.owner_ids.add(self.application.team.owner_id)
+                self.owner_ids.add(self.application.team.owner_id)  # type: ignore
         else:
             self.owner_ids.add(self.application.owner.id)
         if settings.co_owners:
@@ -386,7 +386,7 @@ class BallsDexBot(commands.AutoShardedBot):
             "is now operational![/green][/bold]\n"
         )
 
-    async def blacklist_check(self, interaction: discord.Interaction) -> bool:
+    async def blacklist_check(self, interaction: discord.Interaction[Self]) -> bool:
         if interaction.user.id in self.blacklist:
             if interaction.type != discord.InteractionType.autocomplete:
                 await interaction.response.send_message(
@@ -461,7 +461,7 @@ class BallsDexBot(commands.AutoShardedBot):
             )
 
     async def on_application_command_error(
-        self, interaction: discord.Interaction, error: app_commands.AppCommandError
+        self, interaction: discord.Interaction[Self], error: app_commands.AppCommandError
     ):
         async def send(content: str):
             if interaction.response.is_done():
