@@ -8,9 +8,11 @@ import time
 from pathlib import Path
 
 import discord
+import sentry_sdk
 import yarl
 from discord.ext.commands import when_mentioned_or
 from rich import print
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from tortoise import Tortoise
 
 from ballsdex import __version__ as bot_version
@@ -239,6 +241,18 @@ async def init_tortoise(db_url: str, *, skip_migrations: bool = False):
     await Tortoise.init(config=TORTOISE_ORM)
 
 
+async def init_sentry(cluster_id: int):
+    if settings.sentry_dsn:
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.sentry_environment,
+            release=bot_version,
+            server_name=f"Cluster {cluster_id}",
+            integrations=[AsyncioIntegration()],
+        )  # TODO: Add breadcrumbs for clustering
+        log.info("Sentry initialized.")
+
+
 async def main(
     shard_ids: list[int], shard_count: int, cluster_id: int, cluster_count: int, cluster_name: str
 ):
@@ -301,6 +315,7 @@ async def main(
             cluster_name=cluster_name,
         )
 
+        await init_sentry(cluster_id)
         # exc_handler = functools.partial(global_exception_handler, bot)
         # loop.set_exception_handler(exc_handler)
         # loop.add_signal_handler(
