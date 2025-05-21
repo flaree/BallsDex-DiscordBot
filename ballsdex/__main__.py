@@ -14,6 +14,7 @@ from discord.ext.commands import when_mentioned_or
 from rich import print
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from tortoise import Tortoise
+from yaml import YAMLError
 
 from ballsdex import __version__ as bot_version
 from ballsdex.core.bot import BallsDexBot

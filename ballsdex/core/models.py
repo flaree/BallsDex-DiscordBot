@@ -425,6 +425,11 @@ class FriendPolicy(IntEnum):
     DENY = 2
 
 
+class TradeCooldownPolicy(IntEnum):
+    COOLDOWN = 1
+    BYPASS = 2
+
+
 class Player(models.Model):
     discord_id = fields.BigIntField(
         description="Discord user ID", unique=True, validators=[DiscordSnowflakeValidator()]
@@ -448,6 +453,11 @@ class Player(models.Model):
         FriendPolicy,
         description="How you want to handle friend requests",
         default=FriendPolicy.ALLOW,
+    )
+    trade_cooldown_policy = fields.IntEnumField(
+        TradeCooldownPolicy,
+        description="How you want to handle trade accept cooldown",
+        default=TradeCooldownPolicy.COOLDOWN,
     )
     extra_data = fields.JSONField(default=dict)
     balls: fields.BackwardFKRelation[BallInstance]
