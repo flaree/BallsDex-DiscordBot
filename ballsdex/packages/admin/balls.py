@@ -454,7 +454,7 @@ class Balls(app_commands.Group):
         if not view.value:
             return
         if percentage:
-            balls = await BallInstance.filter(player=player, deleted=False)
+            balls = await BallInstance.filter(player=player)
             to_delete = random.sample(balls, int(len(balls) * (percentage / 100)))
             for ball in to_delete:
                 if soft_delete:
@@ -499,7 +499,7 @@ class Balls(app_commands.Group):
         """
         if interaction.response.is_done():
             return
-        filters = {"deleted": False}  # type: dict[str, bool | int | str]
+        filters = {}
         if countryball:
             filters["ball"] = countryball
         if special:
