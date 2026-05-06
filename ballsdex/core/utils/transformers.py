@@ -186,11 +186,11 @@ class BallInstanceTransformer(ModelTransformer[BallInstance]):
             if trade_type == TradeCommandType.PICK:
                 balls_queryset = (
                     balls_queryset.filter(
-                        Q(Q(locked__isnull=True) | Q(locked__lt=timezone.now() - timedelta(minutes=30)))
+                        Q(Q(locked__isnull=True) | Q(locked__lt=timezone.now() - timedelta(minutes=30))),
+                        Q(special__isnull=True) | Q(special__tradeable=True),
                     )
                     .exclude(tradeable=False)
                     .exclude(ball__tradeable=False)
-                    .exclude(special__tradeable=False)
                 )
             else:
                 balls_queryset = balls_queryset.filter(

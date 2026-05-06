@@ -350,11 +350,11 @@ class Trade(commands.GroupCog):
         query = (
             BallInstance.objects.filter(
                 Q(locked=None) | Q(locked__lt=timezone.now() - timedelta(seconds=60)),
+                Q(special__isnull=True) | Q(special__tradeable=True),
                 player__discord_id=interaction.user.id,
             )
             .exclude(tradeable=False)
             .exclude(ball__tradeable=False)
-            .exclude(special__tradeable=False)
         )
         if countryball:
             query = query.filter(ball=countryball)
